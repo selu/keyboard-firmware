@@ -68,9 +68,14 @@ serial_eeprom_err serial_eeprom_errno = SUCCESS;
 serial_eeprom_err serial_eeprom_start_write(uint8_t* addr){
 	const uint16_t iaddr = (uint16_t) addr;
 
+#ifdef LC128
+	// [ 1 | 0 | 1 | 0 | A2 | A1 | A0 | R/W ] A0-2 = device address
+	uint8_t address_byte = 0b10100000; // 000 address (all low) and write operation
+#else
 	// [ 1 | A2 | A1 | A0 | B2 | B1 | B0 | R/W ] A0-2 = device address, B0-2 = 3 MSB of 11-bit device address
 	uint8_t address_byte = 0b10100000; // 010 address (all low) and write operation
 	address_byte ^= ((iaddr >> 7) & 0b01111110); // select 14-bit device-and-address at once
+#endif
 
 	// the eeprom may be ignoring inputs because it's writing, so we
 	// keep trying to issue our start condition for up to its write
@@ -92,6 +97,14 @@ serial_eeprom_err serial_eeprom_start_write(uint8_t* addr){
 		twi_stop(NOWAIT);
 		return WSELECT_ERROR;
 	}
+
+#ifdef LC128
+	address_byte = ((iaddr >> 8) & 0b00111111); // select high part of 14-bit address
+	if(twi_write_byte(address_byte) != ACK){
+		twi_stop(NOWAIT);
+		return ADDRESS_ERROR;
+	}
+#endif
 
 	if(twi_write_byte(iaddr & 0xff) != ACK){
 		twi_stop(NOWAIT);
@@ -248,7 +261,9 @@ int16_t serial_eeprom_read(const uint8_t* addr, uint8_t* buf, uint16_t len){
 	twi_start();
 
 	uint8_t read_address = 0b10100001; // 010 address (all low) and read operation
+#ifndef LC128
 	read_address ^= (((uint16_t)addr) >> 7) & 0b01111110; // select upper part of 14-bit device-and-address
+#endif
 
 	if(twi_write_byte(read_address) != ACK){
 		serial_eeprom_errno = RSELECT_ERROR; goto end;

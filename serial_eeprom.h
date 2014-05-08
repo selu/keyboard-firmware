@@ -52,7 +52,11 @@
 
 #define EEEXT __attribute__((section(".eeexternal")))
 
-#define EEEXT_PAGE_SIZE 16
+#ifdef LC128
+#  define EEEXT_PAGE_SIZE 64
+#else
+#  define EEEXT_PAGE_SIZE 16
+#endif
 
 typedef enum _serial_eeprom_err {
 	SUCCESS = 0,
